@@ -1,0 +1,5 @@
+# Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
+# Webhook signing secret: Developer Portal > your app > Webhooks.
+TRINGIFY_WEBHOOK_SECRET=
+# 32 random bytes, base64. Generate one with: openssl rand -base64 32
+TOKEN_ENCRYPTION_KEY=

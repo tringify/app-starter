@@ -1,0 +1,26 @@
+{
+  // Rename the Worker before your first deploy.
+  "name": "my-tringify-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/webhooks"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-tringify-app",
+      // Create the database with `npx wrangler d1 create my-tringify-app` and
+      // paste its id here. Local development works without it.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // `tringify app init` fills this in from tringify.app.json.
+    "TRINGIFY_APP_ID": "",
+    "TRINGIFY_STORE_API": "https://api-store.tringify.com/api/2025-01"
+  }
+  // Secrets, set with `npx wrangler secret put NAME` for production and in
+  // .dev.vars for `npm run dev`:
+  //   TRINGIFY_WEBHOOK_SECRET  your app's webhook signing secret (Developer Portal)
+  //   TOKEN_ENCRYPTION_KEY     32 random bytes, base64; encrypts store access tokens
+}
