@@ -2,6 +2,7 @@
 
 A Tringify app as a TypeScript [Cloudflare Worker](https://developers.cloudflare.com/workers/):
 
+- the install redirect, which confirms the install and returns the merchant to the admin,
 - an admin page that opens inside the Tringify admin through App Bridge,
 - a webhook endpoint that verifies signatures and keeps each store's access token,
 - calls to the Store API with that token.
@@ -22,20 +23,26 @@ npm run dev
 ```
 
 `tringify app init` downloads this starter, writes the app's configuration to
-`tringify.app.json`, sets the app ID in `wrangler.jsonc` and creates `.dev.vars`
-with a fresh `TOKEN_ENCRYPTION_KEY`. Copy your webhook signing secret into
-`.dev.vars` as `TRINGIFY_WEBHOOK_SECRET`. The Developer Portal shows it when you
-generate or rotate it: **Apps > your app > Webhooks > Signing Key**.
+`tringify.app.json`, sets the app ID and client ID in `wrangler.jsonc` and creates
+`.dev.vars` with a fresh `TOKEN_ENCRYPTION_KEY`. Copy two secrets from the
+Developer Portal into `.dev.vars`; each is shown once, when you create or
+regenerate it:
 
-Without the CLI, copy `.dev.vars.example` to `.dev.vars` and fill in both values,
-and set `TRINGIFY_APP_ID` in `wrangler.jsonc`.
+| Variable | In the Developer Portal |
+| --- | --- |
+| `TRINGIFY_CLIENT_SECRET` | Apps > your app > Credentials |
+| `TRINGIFY_WEBHOOK_SECRET` | Apps > your app > Webhooks > Signing Key |
+
+Without the CLI, copy `.dev.vars.example` to `.dev.vars` and fill in every value,
+and set `TRINGIFY_APP_ID` and `TRINGIFY_CLIENT_ID` in `wrangler.jsonc`.
 
 ## What is where
 
 | File | Purpose |
 | --- | --- |
-| `src/index.ts` | Routes: `POST /webhooks`, `/api/*` for the admin page, everything else from `public/`. |
-| `src/webhooks.ts` | Verifies `X-Tringify-Signature`, handles each event once, stores the access token from `app.installed` and `app.token_rotated`, forgets it on `app.uninstalled`. |
+| `src/index.ts` | Routes: `GET /oauth/callback`, `POST /webhooks`, `/api/*` for the admin page, everything else from `public/`. |
+| `src/oauth.ts` | The install redirect: exchanges the one-time code to confirm the store, then sends the merchant to the app in the admin. |
+| `src/webhooks.ts` | Verifies `X-Tringify-Signature`, handles each event once by its `event_id`, stores the access token from `app.installed` and `app.token_rotated`, forgets it on `app.uninstalled`. |
 | `src/store-api.ts` | Checks App Bridge session tokens against the Store API `/context` and calls the Store API with a store's token. |
 | `src/crypto.ts` | Encrypts stored access tokens. |
 | `public/` | The admin page. `app.js` gets a session token from App Bridge and calls `/api/overview`. |
@@ -52,6 +59,7 @@ Deploy once to get the Worker's URL, then set it in `tringify.app.json`:
 ```json
 "embed_type": "embedded",
 "admin_ui_url": "https://<worker>.<account>.workers.dev/",
+"redirect_uris": ["https://<worker>.<account>.workers.dev/oauth/callback"],
 "webhook_url": "https://<worker>.<account>.workers.dev/webhooks",
 "store_scopes": ["read_products"]
 ```
@@ -59,16 +67,19 @@ Deploy once to get the Worker's URL, then set it in `tringify.app.json`:
 ```sh
 tringify app config push        # shows the changes, then replaces the draft
 tringify app webhook test       # sends a signed app.test webhook
-tringify app release --bump minor
+tringify app install-link --store <store>.mytringify.com
 ```
 
-`config push` changes only the draft. Stores get it when you release a version
-and it is published (`tringify app versions`, `tringify app publish <version>`).
+`config push` changes only the draft. A private app installs the draft from an
+install link, and `tringify app release --store <id>` sends later drafts to stores
+that installed it. A marketplace app releases versions (`tringify app release
+--bump minor`), which reach stores once approved and published.
 
 ## Deploy
 
 ```sh
 npx wrangler d1 create <app-slug>          # paste the id into wrangler.jsonc
+npx wrangler secret put TRINGIFY_CLIENT_SECRET
 npx wrangler secret put TRINGIFY_WEBHOOK_SECRET
 openssl rand -base64 32 | npx wrangler secret put TOKEN_ENCRYPTION_KEY
 npm run deploy                              # applies migrations, then deploys

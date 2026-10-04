@@ -2,6 +2,10 @@ export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   TRINGIFY_APP_ID: string;
+  TRINGIFY_CLIENT_ID: string;
+  TRINGIFY_CLIENT_SECRET: string;
+  TRINGIFY_OAUTH_TOKEN_URL: string;
+  TRINGIFY_ADMIN_URL: string;
   TRINGIFY_STORE_API: string;
   TRINGIFY_WEBHOOK_SECRET: string;
   TOKEN_ENCRYPTION_KEY: string;

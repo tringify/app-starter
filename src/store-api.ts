@@ -14,6 +14,7 @@ async function call(env: Env, token: string, path: string, init: RequestInit = {
   });
   const body = (await response.json().catch(() => ({}))) as { success?: boolean; data?: unknown; message?: string; error?: { message?: string } };
   if (!response.ok || body.success === false) {
+    console.error(`Store API ${init.method ?? "GET"} ${path} answered HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
     throw new StoreAPIError(response.status, body.error?.message ?? body.message ?? `Store API answered HTTP ${response.status}`);
   }
   return body.data;

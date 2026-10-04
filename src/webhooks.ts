@@ -46,6 +46,7 @@ export async function handleWebhook(request: Request, env: Env): Promise<Respons
   if (delivery.app_id && delivery.app_id !== env.TRINGIFY_APP_ID) {
     return apiError(400, "WRONG_APP", "The webhook is for another app.");
   }
+  if (!delivery.event_id) return apiError(400, "MISSING_EVENT_ID", "The webhook has no event ID.");
   // Each event is handled once, however many times it is delivered.
   const first = await env.DB.prepare("INSERT OR IGNORE INTO handled_events (event_id, handled_at) VALUES (?, ?)")
     .bind(delivery.event_id, new Date().toISOString())

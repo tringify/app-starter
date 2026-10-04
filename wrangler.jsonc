@@ -3,7 +3,7 @@
   "name": "my-tringify-app",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
-  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/webhooks"] },
+  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/webhooks", "/oauth/*"] },
   "d1_databases": [
     {
       "binding": "DB",
@@ -15,12 +15,16 @@
     }
   ],
   "vars": {
-    // `tringify app init` fills this in from tringify.app.json.
+    // `tringify app init` fills in the app ID and client ID.
     "TRINGIFY_APP_ID": "",
+    "TRINGIFY_CLIENT_ID": "",
+    "TRINGIFY_OAUTH_TOKEN_URL": "https://api-dev.tringify.com/api/v1/oauth/token",
+    "TRINGIFY_ADMIN_URL": "https://admin.tringify.com",
     "TRINGIFY_STORE_API": "https://api-store.tringify.com/api/2025-01"
   }
   // Secrets, set with `npx wrangler secret put NAME` for production and in
   // .dev.vars for `npm run dev`:
+  //   TRINGIFY_CLIENT_SECRET   your app's client secret (Developer Portal)
   //   TRINGIFY_WEBHOOK_SECRET  your app's webhook signing secret (Developer Portal)
   //   TOKEN_ENCRYPTION_KEY     32 random bytes, base64; encrypts store access tokens
 }

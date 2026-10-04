@@ -18,12 +18,12 @@ async function start() {
     const { store, products } = await api("/api/overview");
     document.getElementById("store").textContent = `${store.domain} · ${store.currency}`;
     const list = document.getElementById("products");
-    for (const product of products ?? []) {
+    for (const product of products) {
       const item = document.createElement("li");
       item.textContent = product.title;
       list.append(item);
     }
-    if (!products?.length) list.textContent = "No products yet.";
+    if (products.length === 0) list.textContent = "No products yet.";
   } catch (error) {
     document.getElementById("store").textContent = "";
     bridge.toast(error.message, "error");
