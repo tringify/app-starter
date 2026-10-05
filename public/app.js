@@ -3,10 +3,21 @@
 const bridge = TringifyBridge.init();
 
 async function api(path) {
-  // Ask only for the scopes this page needs; each must be in your app's
-  // store_scopes.
-  const session = await bridge.getSessionToken({ scopes: ["read_products"] });
-  const response = await fetch(path, { headers: { authorization: `Bearer ${session.token}` } });
+  for (let attempt = 0; ; attempt++) {
+    // Ask only for the scopes this page needs; each must be in your app's
+    // store_scopes.
+    const session = await bridge.getSessionToken({ scopes: ["read_products"] });
+    const response = await fetch(path, { headers: { authorization: `Bearer ${session.token}` } });
+    // Rate limited: wait as long as Retry-After says, a few times at most.
+    if (response.status === 429 && attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, Math.max(1, Number(response.headers.get("retry-after")) || 2) * 1000));
+      continue;
+    }
+    return read(response);
+  }
+}
+
+async function read(response) {
   const body = await response.json();
   if (!response.ok) throw new Error(body.error?.message ?? `HTTP ${response.status}`);
   return body;
