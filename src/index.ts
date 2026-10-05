@@ -18,10 +18,10 @@ export default {
 async function handleAPI(request: Request, env: Env, url: URL): Promise<Response> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return apiError(401, "UNAUTHORIZED", "A session token is required.");
-  const session = await sessionContext(env, authorization.slice("Bearer ".length));
-  if (!session) return apiError(401, "UNAUTHORIZED", "The session is not valid for this app.");
-
   try {
+    const session = await sessionContext(env, authorization.slice("Bearer ".length));
+    if (!session) return apiError(401, "UNAUTHORIZED", "The session is not valid for this app.");
+
     if (url.pathname === "/api/overview" && request.method === "GET") {
       // An example Store API read with the installation's token. Change the
       // path and the read_products scope in tringify.app.json together.
@@ -32,6 +32,13 @@ async function handleAPI(request: Request, env: Env, url: URL): Promise<Response
       });
     }
   } catch (error) {
+    // The Store API limits each app per store, development stores most
+    // tightly. Pass a 429 and its Retry-After on so the page can wait.
+    if (error instanceof StoreAPIError && error.status === 429) {
+      const response = apiError(429, "RATE_LIMITED", error.message);
+      response.headers.set("retry-after", String(Math.max(1, error.retryAfter)));
+      return response;
+    }
     if (error instanceof StoreAPIError) return apiError(error.status === 409 ? 409 : 502, "STORE_API", error.message);
     throw error;
   }

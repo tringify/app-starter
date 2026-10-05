@@ -2,7 +2,8 @@ import { decrypt } from "./crypto.ts";
 import type { Env } from "./env.ts";
 
 export class StoreAPIError extends Error {
-  constructor(readonly status: number, message: string) {
+  // retryAfter is the wait in seconds the Store API asked for on a 429.
+  constructor(readonly status: number, message: string, readonly retryAfter = 0) {
     super(message);
   }
 }
@@ -15,7 +16,11 @@ async function call(env: Env, token: string, path: string, init: RequestInit = {
   const body = (await response.json().catch(() => ({}))) as { success?: boolean; data?: unknown; message?: string; error?: { message?: string } };
   if (!response.ok || body.success === false) {
     console.error(`Store API ${init.method ?? "GET"} ${path} answered HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
-    throw new StoreAPIError(response.status, body.error?.message ?? body.message ?? `Store API answered HTTP ${response.status}`);
+    throw new StoreAPIError(
+      response.status,
+      body.error?.message ?? body.message ?? `Store API answered HTTP ${response.status}`,
+      Number(response.headers.get("retry-after")) || 0,
+    );
   }
   return body.data;
 }
