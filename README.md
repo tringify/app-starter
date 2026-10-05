@@ -12,9 +12,8 @@ HTTPS requests works; this starter shows the pieces every app needs.
 
 ## Start
 
-Create the app in the [Developer Portal](https://dev.tringify.com) first, then:
-
 ```sh
+tringify app create --name "My app" --type standard --distribution private
 tringify app init --app <app-id>
 cd <app-slug>
 npm install
@@ -24,14 +23,13 @@ npm run dev
 
 `tringify app init` downloads this starter, writes the app's configuration to
 `tringify.app.json`, sets the app ID and client ID in `wrangler.jsonc` and creates
-`.dev.vars` with a fresh `TOKEN_ENCRYPTION_KEY`. Copy two secrets from the
-Developer Portal into `.dev.vars`; each is shown once, when you create or
-regenerate it:
+`.dev.vars` with a fresh `TOKEN_ENCRYPTION_KEY`. Add two secrets to
+`.dev.vars`; each is shown once, when it is issued:
 
-| Variable | In the Developer Portal |
+| Variable | Where it comes from |
 | --- | --- |
-| `TRINGIFY_CLIENT_SECRET` | Apps > your app > Credentials |
-| `TRINGIFY_WEBHOOK_SECRET` | Apps > your app > Webhooks > Signing Key |
+| `TRINGIFY_CLIENT_SECRET` | the output of `tringify app create` |
+| `TRINGIFY_WEBHOOK_SECRET` | the output of `tringify app webhook rotate-key` |
 
 Without the CLI, copy `.dev.vars.example` to `.dev.vars` and fill in every value,
 and set `TRINGIFY_APP_ID` and `TRINGIFY_CLIENT_ID` in `wrangler.jsonc`.
