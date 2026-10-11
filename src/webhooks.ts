@@ -48,6 +48,7 @@ export function parseSignatureHeader(header: string): SignatureHeader | null {
     if (separator < 0) return null;
     const name = pair.slice(0, separator).trim();
     const value = pair.slice(separator + 1).trim();
+    if (!name) return null;
     if (name === "t") {
       if (timestamp !== undefined || !/^\d+$/.test(value)) return null;
       timestamp = value;

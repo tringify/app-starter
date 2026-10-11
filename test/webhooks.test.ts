@@ -65,6 +65,8 @@ test("ignores unknown keys and refuses malformed headers", async () => {
   // A pair without "=", an empty pair, and more than 8 pairs.
   assert.equal(await verifySignature(`t=${t},v1=${valid},junk`, body, secret, now), false);
   assert.equal(await verifySignature(`t=${t},,v1=${valid}`, body, secret, now), false);
+  // A pair with an empty name.
+  assert.equal(await verifySignature(`t=${t},v1=${valid},=junk`, body, secret, now), false);
   assert.equal(await verifySignature(`t=${t},v1=${valid}` + ",x=1".repeat(7), body, secret, now), false);
   assert.equal(await verifySignature(`t=${t},v1=${valid}` + ",x=1".repeat(6), body, secret, now), true);
   assert.equal(await verifySignature("", body, secret, now), false);
