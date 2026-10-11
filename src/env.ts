@@ -8,6 +8,8 @@ export interface Env {
   TRINGIFY_ADMIN_URL: string;
   TRINGIFY_STORE_API: string;
   TRINGIFY_WEBHOOK_SECRET: string;
+  // The secret TRINGIFY_WEBHOOK_SECRET replaced; set only while rotating.
+  TRINGIFY_WEBHOOK_SECRET_PREVIOUS?: string;
   TOKEN_ENCRYPTION_KEY: string;
 }
 

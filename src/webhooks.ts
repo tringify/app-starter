@@ -26,20 +26,70 @@ function equal(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// verifySignature checks X-Tringify-Signature: t=<unix seconds>,v1=<hex
-// HMAC-SHA256 of "<t>.<raw body>" keyed with the webhook signing secret>.
-export async function verifySignature(header: string, body: string, secret: string, now = Date.now()): Promise<boolean> {
-  const match = /^t=(\d{10}),v1=([0-9a-f]{64})$/.exec(header);
-  if (!match || !secret) return false;
-  if (Math.abs(now / 1000 - Number(match[1])) > maxAgeSeconds) return false;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const expected = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${match[1]}.${body}`)));
-  return equal(expected, match[2]);
+// A header with more pairs than this is refused unread.
+const maxSignaturePairs = 8;
+
+export interface SignatureHeader {
+  timestamp: string;
+  signatures: string[];
+}
+
+// parseSignatureHeader reads X-Tringify-Signature: t=<unix seconds>,v1=<hex>[,v1=<hex>...].
+// While the platform rotates its signing key it sends one v1 per active key.
+// Unknown keys are future schemes and are skipped. Returns null when the
+// header is malformed.
+export function parseSignatureHeader(header: string): SignatureHeader | null {
+  const pairs = header.split(",");
+  if (pairs.length > maxSignaturePairs) return null;
+  let timestamp: string | undefined;
+  const signatures: string[] = [];
+  for (const pair of pairs) {
+    const separator = pair.indexOf("=");
+    if (separator < 0) return null;
+    const name = pair.slice(0, separator).trim();
+    const value = pair.slice(separator + 1).trim();
+    if (name === "t") {
+      if (timestamp !== undefined || !/^\d+$/.test(value)) return null;
+      timestamp = value;
+    } else if (name === "v1") {
+      if (!/^[0-9a-f]{64}$/.test(value)) return null;
+      signatures.push(value);
+    }
+  }
+  if (timestamp === undefined || signatures.length === 0) return null;
+  return { timestamp, signatures };
+}
+
+// verifySignature checks X-Tringify-Signature: each v1 is the hex
+// HMAC-SHA256 of "<t>.<raw body>" keyed with a webhook signing secret. The
+// delivery is accepted when any configured secret matches any v1, so the app
+// keeps working whether it deploys a new secret before or after the platform
+// switches to it.
+export async function verifySignature(header: string, body: string, secrets: string | readonly (string | undefined)[], now = Date.now()): Promise<boolean> {
+  const parsed = parseSignatureHeader(header);
+  const keys = (typeof secrets === "string" ? [secrets] : secrets).filter((secret): secret is string => !!secret);
+  if (!parsed || keys.length === 0) return false;
+  if (Math.abs(now / 1000 - Number(parsed.timestamp)) > maxAgeSeconds) return false;
+  const message = new TextEncoder().encode(`${parsed.timestamp}.${body}`);
+  let valid = false;
+  for (const secret of keys) {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const expected = hex(await crypto.subtle.sign("HMAC", key, message));
+    // Compare against every candidate, never stopping at the first match.
+    for (const signature of parsed.signatures) valid = equal(expected, signature) || valid;
+  }
+  return valid;
+}
+
+// webhookSecrets lists the secrets a delivery may be signed with: the
+// current one and, while rotating, the one it replaces.
+export function webhookSecrets(env: Pick<Env, "TRINGIFY_WEBHOOK_SECRET" | "TRINGIFY_WEBHOOK_SECRET_PREVIOUS">): string[] {
+  return [env.TRINGIFY_WEBHOOK_SECRET, env.TRINGIFY_WEBHOOK_SECRET_PREVIOUS].filter((secret): secret is string => !!secret);
 }
 
 export async function handleWebhook(request: Request, env: Env): Promise<Response> {
   const body = await request.text();
-  if (!(await verifySignature(request.headers.get("x-tringify-signature") ?? "", body, env.TRINGIFY_WEBHOOK_SECRET))) {
+  if (!(await verifySignature(request.headers.get("x-tringify-signature") ?? "", body, webhookSecrets(env)))) {
     return apiError(401, "INVALID_SIGNATURE", "The webhook signature is not valid.");
   }
   const delivery = JSON.parse(body) as Delivery;
