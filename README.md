@@ -86,6 +86,22 @@ npm run deploy                              # applies migrations, then deploys
 Use a production `TOKEN_ENCRYPTION_KEY` that differs from the one in `.dev.vars`.
 Changing it later makes stored tokens unreadable; stores then need to reinstall.
 
+### Rotate the webhook secret
+
+For 72 hours after `tringify app webhook rotate-key`, the platform signs each
+delivery with both the new and the previous key, sending one `v1=` value per key
+in `X-Tringify-Signature`. The app accepts a delivery when any configured secret
+matches any `v1`. To rotate without dropping deliveries, keep the old secret as
+`TRINGIFY_WEBHOOK_SECRET_PREVIOUS` while you deploy the new one:
+
+```sh
+npx wrangler secret put TRINGIFY_WEBHOOK_SECRET_PREVIOUS   # the current secret
+npx wrangler secret put TRINGIFY_WEBHOOK_SECRET            # the new secret
+npx wrangler secret delete TRINGIFY_WEBHOOK_SECRET_PREVIOUS  # after the overlap ends
+```
+
+`TRINGIFY_WEBHOOK_SECRET_PREVIOUS` is optional; leave it unset otherwise.
+
 ## Check
 
 ```sh
