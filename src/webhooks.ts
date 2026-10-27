@@ -135,6 +135,42 @@ async function handleEvent(delivery: Delivery, env: Env): Promise<void> {
         .run();
       return;
     }
+    // The three privacy events are mandatory: every app gets app.store_redact,
+    // and an app whose scopes can read customer data (read_customers,
+    // read_orders, or a write scope implying them) gets the two customer
+    // events. They arrive even while webhooks are switched off, and cannot be
+    // unsubscribed.
+    case "app.store_redact": {
+      // 48 hours after an uninstall, unless the store installed the app again
+      // first, and at once when the store is deleted: delete everything the
+      // app keeps for the store. Here that is the installation row; add your
+      // own tables. A store that reinstalled after this uninstall keeps its data.
+      const uninstalledAt = isoTime(data.uninstalled_at);
+      await env.DB.prepare(
+        `DELETE FROM installations
+         WHERE store_id = ?1 AND NOT (uninstalled_at IS NULL AND installed_at > ?2)`,
+      )
+        .bind(delivery.store_id, uninstalledAt)
+        .run();
+      return;
+    }
+    case "app.customer_data_request": {
+      // A shopper asked the store for a copy of their personal data. Send the
+      // store what your app holds about them before privacy_request.due_at.
+      // Find it by customer.id (empty for a shopper without an account) and by
+      // customer.email. This starter keeps nothing about shoppers.
+      const { customer, request } = privacyRequest(data);
+      console.log(`Privacy request ${request.reference} (copy of data, due ${request.due_at}) for store ${delivery.store_id}, customer ${customer.id || "without an account"}: no shopper data is kept.`);
+      return;
+    }
+    case "app.customer_redact": {
+      // The store erased a shopper at their request. Delete what your app
+      // holds about them, matching customer.id and customer.email, unless the
+      // law requires you to keep it. This starter keeps nothing about shoppers.
+      const { customer, request } = privacyRequest(data);
+      console.log(`Privacy request ${request.reference} (erasure) for store ${delivery.store_id}, customer ${customer.id || "without an account"}: no shopper data is kept.`);
+      return;
+    }
     case "app.test":
       console.log("Received the test webhook.");
       return;
@@ -142,6 +178,17 @@ async function handleEvent(delivery: Delivery, env: Env): Promise<void> {
       // Events you subscribe to in tringify.app.json arrive here.
       console.log(`Received ${delivery.event} for store ${delivery.store_id}.`);
   }
+}
+
+// privacyRequest reads the body of app.customer_data_request and
+// app.customer_redact.
+function privacyRequest(data: Record<string, unknown>): { customer: { id: string; email: string }; request: { id: string; reference: string; due_at: string } } {
+  const customer = (data.customer ?? {}) as { id?: unknown; email?: unknown };
+  const request = (data.privacy_request ?? {}) as { id?: unknown; reference?: unknown; due_at?: unknown };
+  return {
+    customer: { id: String(customer.id ?? ""), email: String(customer.email ?? "") },
+    request: { id: String(request.id ?? ""), reference: String(request.reference ?? ""), due_at: String(request.due_at ?? "") },
+  };
 }
 
 // isoTime normalizes a timestamp to one fixed-width UTC form, so stored

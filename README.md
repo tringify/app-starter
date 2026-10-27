@@ -40,7 +40,7 @@ and set `TRINGIFY_APP_ID` and `TRINGIFY_CLIENT_ID` in `wrangler.jsonc`.
 | --- | --- |
 | `src/index.ts` | Routes: `GET /oauth/callback`, `POST /webhooks`, `/api/*` for the admin page, everything else from `public/`. |
 | `src/oauth.ts` | The install redirect: exchanges the one-time code to confirm the store, then sends the merchant to the app in the admin. |
-| `src/webhooks.ts` | Verifies `X-Tringify-Signature`, handles each event once by its `event_id`, stores the access token from `app.installed` and `app.token_rotated`, forgets it on `app.uninstalled`. |
+| `src/webhooks.ts` | Verifies `X-Tringify-Signature`, handles each event once by its `event_id`, stores the access token from `app.installed` and `app.token_rotated`, forgets it on `app.uninstalled`, and handles the mandatory privacy events (see below). |
 | `src/store-api.ts` | Checks App Bridge session tokens against the Store API `/context` and calls the Store API with a store's token. |
 | `src/crypto.ts` | Encrypts stored access tokens. |
 | `public/` | The admin page. `app.js` gets a session token from App Bridge and calls `/api/overview`. |
@@ -68,10 +68,33 @@ tringify app webhook test       # sends a signed app.test webhook
 tringify app install-link --store <store>.mytringify.com
 ```
 
+An app whose scopes can read customer data (`read_customers`, `read_orders`,
+or a write scope that includes them) must have a `webhook_url`: create, save,
+`config push` and release refuse it otherwise. A marketplace submit also sends
+a signed `app.test` to it and needs a 2xx answer.
+
 `config push` changes only the draft. A private app installs the draft from an
 install link, and `tringify app release --store <id>` sends later drafts to stores
 that installed it. A marketplace app releases versions (`tringify app release
 --bump minor`), which reach stores once approved and published.
+
+## Privacy events
+
+Three webhook events are mandatory. They cannot be unsubscribed and arrive at
+`webhook_url` even while webhooks are switched off. `src/webhooks.ts` handles
+each one; extend the handlers when your app stores data of its own.
+
+| Event | Sent to | What to do |
+| --- | --- | --- |
+| `app.customer_data_request` | Installed apps that can read customer data | A shopper asked the store for a copy of their personal data. Send the store what your app holds about them before `privacy_request.due_at`. |
+| `app.customer_redact` | Installed apps that can read customer data | The store erased a shopper at their request. Delete what your app holds about them, unless the law requires you to keep it. |
+| `app.store_redact` | Every app, 48 hours after a store uninstalls it unless it is installed again first, and at once when the store is deleted | Delete everything your app keeps for the store. The starter deletes the store's installation row. |
+
+The customer events carry `privacy_request` (`id`, `reference`, `created_at`,
+`due_at`) and `customer` (`id`, empty for a shopper without an account, and
+`email`): match your records on both. `app.store_redact` carries
+`installation_id` and `uninstalled_at`. Like every event, a retry repeats the
+`event_id`, so each is handled once.
 
 ## Deploy
 
